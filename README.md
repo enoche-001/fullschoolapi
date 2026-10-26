@@ -40,3 +40,8 @@ Set them in Vercel only if the website address changes.
 - Google side: myaccount.google.com/apppasswords lists every active App Password. If "school portal" is there, it is active. If it is missing, it was deleted: create a new one.
 - Server side: approve a test application. If Gmail rejects the password, the admin toast says so in plain words.
 - To replace it: delete the old one on that page, create a new one, paste it (no spaces) into GMAIL_APP_PASSWORD in Vercel, then Redeploy.
+
+## Checking the server from a browser
+- https://fullschoolapi.vercel.app/api/verify shows `{"ok":true,"service":"verify","paystackSecretKeySet":true}`
+- https://fullschoolapi.vercel.app/api/send-credentials shows `gmailUserSet`, `gmailAppPasswordSet` and `nodemailerInstalled`, which should all be `true`.
+Any `false` means that variable/package is missing: fix it and Redeploy.
