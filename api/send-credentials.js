@@ -7,7 +7,7 @@
 // Vercel environment variables:
 //   GMAIL_USER          the Gmail address that sends the mail
 //   GMAIL_APP_PASSWORD  a 16-character Google "App password" (NOT your normal password)
-// Optional: ALLOWED_ORIGIN, SCHOOL_NAME, PORTAL_URL (site base address), LOGO_URL, FIREBASE_PROJECT_ID
+// Optional: ALLOWED_ORIGIN, SCHOOL_NAME, PORTAL_URL (site base address), FIREBASE_PROJECT_ID
 // (nodemailer is loaded inside the handler so a missing package gives a readable error.)
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'veil-1-bd7b5';
@@ -97,15 +97,12 @@ module.exports = async (req, res) => {
   if (!regNumber || !password) return res.status(400).json({ ok: false, message: 'Missing login details' });
 
   // PORTAL_URL = the website's base address, e.g. https://yourname.github.io/yourrepo (no trailing slash).
-  // It gives the email a login button and the school logo (taken from /assets/newtown-academy-logo.jpg).
+  // It sets where the login button goes. (The logo is built into the email.)
   const base = (process.env.PORTAL_URL || 'https://enoche-001.github.io/fullschool').trim().replace(/\/+$/, '');
   const loginUrl = base ? base + '/student.html' : '';
-  const logoUrl = (process.env.LOGO_URL || '').trim() || (base ? base + '/assets/newtown-academy-logo.jpg' : '');
   const NAVY = '#0d1f3c', GOLD = '#b8902a';
 
-  const logo = logoUrl
-    ? '<img src="' + esc(logoUrl) + '" width="72" height="72" alt="' + esc(SCHOOL) + '" style="display:block;margin:0 auto 12px;border-radius:50%;border:3px solid ' + GOLD + ';background:#fff">'
-    : '';
+  const logo = '<img src="cid:schoollogo" width="72" height="72" alt="' + esc(SCHOOL) + '" style="display:block;margin:0 auto 12px;border-radius:50%;border:3px solid ' + GOLD + ';background:#fff">';
   const button = loginUrl
     ? '<table role="presentation" align="center" style="margin:26px auto 4px"><tr><td style="background:' + NAVY + ';border-radius:8px">' +
       '<a href="' + esc(loginUrl) + '" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px">Log in to the Student Portal</a>' +
@@ -147,6 +144,8 @@ module.exports = async (req, res) => {
       to: toEmail,
       subject: 'Admission approved: login details for ' + studentName,
       html,
+      attachments: [{ filename: 'logo.jpg', content: require('../lib/logo.js'), cid: 'schoollogo', contentDisposition: 'inline' }],
+      replyTo: user,
       text: 'Dear Parent/Guardian, the admission for ' + studentName + ' at ' + SCHOOL + ' has been approved. Registration number: ' + regNumber + ' | Password: ' + password + (loginUrl ? ' | Login: ' + loginUrl : '') + '. Please keep these details private.'
     });
     return res.status(200).json({ ok: true });
