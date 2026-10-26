@@ -17,3 +17,15 @@ Tiny Vercel serverless function that verifies Paystack payments for the Newtown 
 ## Notes
 - The secret key lives only in Vercel. Never put it in the portal files.
 - Use the matching key pair: test public key in the portal needs the sk_test key here; switch both to live together.
+
+## Email (api/send-credentials.js)
+Sends the parent's login-details email after an admin approves an application.
+Only a signed-in admin (a user with a doc in Firestore `admins/{uid}`) can call it.
+
+Extra environment variables on Vercel:
+- `GMAIL_USER` = the Gmail address that will send the mail
+- `GMAIL_APP_PASSWORD` = a Google App Password (Google Account > Security > turn on 2-Step Verification > App passwords > create one; 16 characters, no spaces)
+- `SCHOOL_NAME` (optional, default "Newtown Academy")
+- `PORTAL_URL` (optional) adds an "Open the student portal" link
+
+After adding them, redeploy. Gmail allows roughly 500 emails a day, far more than needed.

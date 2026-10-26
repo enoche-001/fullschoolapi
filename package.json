@@ -1,6 +1,7 @@
 {
   "name": "school-payment-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "engines": { "node": ">=18" }
+  "engines": { "node": ">=18" },
+  "dependencies": { "nodemailer": "^6.9.14" }
 }
