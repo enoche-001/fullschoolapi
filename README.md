@@ -30,3 +30,13 @@ Extra environment variables on Vercel:
 - `LOGO_URL` (optional) = a direct image link, only if you want a different logo than assets/newtown-academy-logo.jpg
 
 After adding them, redeploy. Gmail allows roughly 500 emails a day, far more than needed.
+
+## Defaults baked in
+If `ALLOWED_ORIGIN` or `PORTAL_URL` are not set in Vercel, the code falls back to
+`https://enoche-001.github.io` and `https://enoche-001.github.io/fullschool`.
+Set them in Vercel only if the website address changes.
+
+## Checking the Gmail App Password
+- Google side: myaccount.google.com/apppasswords lists every active App Password. If "school portal" is there, it is active. If it is missing, it was deleted: create a new one.
+- Server side: approve a test application. If Gmail rejects the password, the admin toast says so in plain words.
+- To replace it: delete the old one on that page, create a new one, paste it (no spaces) into GMAIL_APP_PASSWORD in Vercel, then Redeploy.
