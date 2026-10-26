@@ -45,3 +45,7 @@ Set them in Vercel only if the website address changes.
 - https://fullschoolapi.vercel.app/api/verify shows `{"ok":true,"service":"verify","paystackSecretKeySet":true}`
 - https://fullschoolapi.vercel.app/api/send-credentials shows `gmailUserSet`, `gmailAppPasswordSet` and `nodemailerInstalled`, which should all be `true`.
 Any `false` means that variable/package is missing: fix it and Redeploy.
+
+## Logo and login button
+The school logo is built into the email (lib/logo.js), so it shows without depending on any website.
+Set `PORTAL_URL` in Vercel to your live website address (no slash at the end) so the login button goes to the right site.
