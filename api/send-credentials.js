@@ -38,7 +38,7 @@ async function isAdmin(idToken) {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'https://enoche-001.github.io');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Vary', 'Origin');
@@ -71,7 +71,7 @@ module.exports = async (req, res) => {
 
   // PORTAL_URL = the website's base address, e.g. https://yourname.github.io/yourrepo (no trailing slash).
   // It gives the email a login button and the school logo (taken from /assets/newtown-academy-logo.jpg).
-  const base = (process.env.PORTAL_URL || '').trim().replace(/\/+$/, '');
+  const base = (process.env.PORTAL_URL || 'https://enoche-001.github.io/fullschool').trim().replace(/\/+$/, '');
   const loginUrl = base ? base + '/student.html' : '';
   const logoUrl = (process.env.LOGO_URL || '').trim() || (base ? base + '/assets/newtown-academy-logo.jpg' : '');
   const NAVY = '#0d1f3c', GOLD = '#b8902a';
@@ -124,7 +124,15 @@ module.exports = async (req, res) => {
     });
     return res.status(200).json({ ok: true });
   } catch (e) {
-    console.error('send failed:', e && e.message);
-    return res.status(502).json({ ok: false, message: 'Email provider rejected the send' });
+    console.error('send failed:', e && e.code, e && e.message);
+    let msg = 'Email provider rejected the send';
+    if (e && e.code === 'EAUTH') {
+      msg = 'Gmail rejected the login. The App Password is wrong, was deleted, or 2-Step Verification is off. Create a new App Password and update GMAIL_APP_PASSWORD in Vercel, then redeploy.';
+    } else if (e && (e.code === 'ESOCKET' || e.code === 'ETIMEDOUT' || e.code === 'ECONNECTION')) {
+      msg = 'Could not reach Gmail. Try again in a moment.';
+    } else if (e && e.responseCode === 550) {
+      msg = 'Gmail refused to send to that address. Check the parent email.';
+    }
+    return res.status(502).json({ ok: false, message: msg });
   }
 };

@@ -4,7 +4,7 @@
 // Optional: ALLOWED_ORIGIN (e.g. https://yourname.github.io) to lock CORS down.
 
 module.exports = async (req, res) => {
-  const origin = process.env.ALLOWED_ORIGIN || '*';
+  const origin = process.env.ALLOWED_ORIGIN || 'https://enoche-001.github.io';
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
