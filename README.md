@@ -26,6 +26,7 @@ Extra environment variables on Vercel:
 - `GMAIL_USER` = the Gmail address that will send the mail
 - `GMAIL_APP_PASSWORD` = a Google App Password (Google Account > Security > turn on 2-Step Verification > App passwords > create one; 16 characters, no spaces)
 - `SCHOOL_NAME` (optional, default "Newtown Academy")
-- `PORTAL_URL` (optional) adds an "Open the student portal" link
+- `PORTAL_URL` (optional but recommended) = your website base address, e.g. https://yourname.github.io/yourrepo (no trailing slash). Adds the school logo and a "Log in to the Student Portal" button to the email
+- `LOGO_URL` (optional) = a direct image link, only if you want a different logo than assets/newtown-academy-logo.jpg
 
 After adding them, redeploy. Gmail allows roughly 500 emails a day, far more than needed.
