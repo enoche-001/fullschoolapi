@@ -2,48 +2,70 @@
 // Headers: Authorization: Bearer <Firebase ID token of a signed-in ADMIN>
 // Body:    { toEmail, studentName, regNumber, password, className }
 // Sends the login details to the parent by Gmail (nodemailer).
+// GET /api/send-credentials  -> shows whether the server is set up (no secrets shown).
 //
 // Vercel environment variables:
 //   GMAIL_USER          the Gmail address that sends the mail
 //   GMAIL_APP_PASSWORD  a 16-character Google "App password" (NOT your normal password)
-//   ALLOWED_ORIGIN      e.g. https://yourname.github.io
-// Optional: SCHOOL_NAME, PORTAL_URL (site base address), LOGO_URL, FIREBASE_API_KEY, FIREBASE_PROJECT_ID
+// Optional: ALLOWED_ORIGIN, SCHOOL_NAME, PORTAL_URL (site base address), LOGO_URL, FIREBASE_PROJECT_ID
+// (nodemailer is loaded inside the handler so a missing package gives a readable error.)
 
-// nodemailer is loaded inside the handler (below) so a missing package gives a readable error
-// instead of a crash that the browser only reports as "Failed to fetch".
-
-const API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyAA4FrgXKF8SDYvS3jnTj8wmyX4AzqZWpU';
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'veil-1-bd7b5';
 const SCHOOL = process.env.SCHOOL_NAME || 'Newtown Academy';
+const SITE = 'https://enoche-001.github.io';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// Confirms the token is a real Firebase login, then confirms /admins/{uid} exists.
-// Firestore's own rules do the admin check, because we call it with the user's token.
+// Accepts the website's origin even if ALLOWED_ORIGIN in Vercel was typed with a path or trailing slash.
+function allowedOrigins() {
+  const list = [SITE];
+  const env = (process.env.ALLOWED_ORIGIN || '').trim();
+  if (env && env !== '*') { try { list.push(new URL(env).origin); } catch (e) {} }
+  return list;
+}
+function setCors(req, res, headers) {
+  const list = allowedOrigins();
+  const o = req.headers.origin;
+  res.setHeader('Access-Control-Allow-Origin', o && list.includes(o) ? o : list[list.length - 1]);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', headers);
+  res.setHeader('Vary', 'Origin');
+}
+
+// Admin check. The uid is read from the token, then Firestore is asked for /admins/{uid}
+// WITH the token. Firestore itself rejects a fake/expired token (401) and your rules only
+// allow reading that doc for its owner, so only a real signed-in admin gets a 200.
+function uidFromToken(t) {
+  try {
+    const payload = JSON.parse(Buffer.from(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+    return payload.user_id || payload.sub || '';
+  } catch (e) { return ''; }
+}
 async function isAdmin(idToken) {
-  const lk = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + API_KEY, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idToken })
-  });
-  if (!lk.ok) return false;
-  const lj = await lk.json();
-  const uid = lj && lj.users && lj.users[0] && lj.users[0].localId;
-  if (!uid) return false;
-  const fs = await fetch(
+  const uid = uidFromToken(idToken);
+  if (!uid || !/^[A-Za-z0-9]{10,128}$/.test(uid)) return false;
+  const r = await fetch(
     'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/(default)/documents/admins/' + encodeURIComponent(uid),
     { headers: { Authorization: 'Bearer ' + idToken } }
   );
-  return fs.status === 200;
+  return r.status === 200;
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'https://enoche-001.github.io');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Vary', 'Origin');
+  setCors(req, res, 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
+
+  if (req.method === 'GET') {
+    let installed = true;
+    try { require('nodemailer'); } catch (e) { installed = false; }
+    return res.status(200).json({
+      ok: true, service: 'send-credentials',
+      gmailUserSet: !!process.env.GMAIL_USER,
+      gmailAppPasswordSet: !!process.env.GMAIL_APP_PASSWORD,
+      nodemailerInstalled: installed
+    });
+  }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, message: 'Method not allowed' });
 
   let nodemailer;

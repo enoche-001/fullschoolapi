@@ -3,14 +3,30 @@
 // Needs one environment variable on Vercel: PAYSTACK_SECRET_KEY
 // Optional: ALLOWED_ORIGIN (e.g. https://yourname.github.io) to lock CORS down.
 
-module.exports = async (req, res) => {
-  const origin = process.env.ALLOWED_ORIGIN || 'https://enoche-001.github.io';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Vary', 'Origin');
 
+// Accepts the website's origin even if ALLOWED_ORIGIN in Vercel was typed with a path or trailing slash.
+const SITE = 'https://enoche-001.github.io';
+function allowedOrigins() {
+  const list = [SITE];
+  const env = (process.env.ALLOWED_ORIGIN || '').trim();
+  if (env && env !== '*') { try { list.push(new URL(env).origin); } catch (e) {} }
+  return list;
+}
+function setCors(req, res, headers) {
+  const list = allowedOrigins();
+  const o = req.headers.origin;
+  res.setHeader('Access-Control-Allow-Origin', o && list.includes(o) ? o : list[list.length - 1]);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', headers);
+  res.setHeader('Vary', 'Origin');
+}
+
+module.exports = async (req, res) => {
+  setCors(req, res, 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method === 'GET') {
+    return res.status(200).json({ ok: true, service: 'verify', paystackSecretKeySet: !!process.env.PAYSTACK_SECRET_KEY });
+  }
   if (req.method !== 'POST') return res.status(405).json({ status: false, message: 'Method not allowed' });
 
   const secret = process.env.PAYSTACK_SECRET_KEY;
