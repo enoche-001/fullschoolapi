@@ -9,7 +9,8 @@
 //   ALLOWED_ORIGIN      e.g. https://yourname.github.io
 // Optional: SCHOOL_NAME, PORTAL_URL (site base address), LOGO_URL, FIREBASE_API_KEY, FIREBASE_PROJECT_ID
 
-const nodemailer = require('nodemailer');
+// nodemailer is loaded inside the handler (below) so a missing package gives a readable error
+// instead of a crash that the browser only reports as "Failed to fetch".
 
 const API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyAA4FrgXKF8SDYvS3jnTj8wmyX4AzqZWpU';
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'veil-1-bd7b5';
@@ -44,6 +45,10 @@ module.exports = async (req, res) => {
   res.setHeader('Vary', 'Origin');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ ok: false, message: 'Method not allowed' });
+
+  let nodemailer;
+  try { nodemailer = require('nodemailer'); }
+  catch (e) { return res.status(500).json({ ok: false, message: 'Server is missing nodemailer. Upload the new package.json to the server repo and redeploy.' }); }
 
   const user = process.env.GMAIL_USER, pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) return res.status(500).json({ ok: false, message: 'Email not configured on the server' });
