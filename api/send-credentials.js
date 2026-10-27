@@ -20,8 +20,10 @@ const esc = (s) => String(s == null ? '' : s)
 // Accepts the website's origin even if ALLOWED_ORIGIN in Vercel was typed with a path or trailing slash.
 function allowedOrigins() {
   const list = [SITE];
-  const env = (process.env.ALLOWED_ORIGIN || '').trim();
-  if (env && env !== '*') { try { list.push(new URL(env).origin); } catch (e) {} }
+  // ALLOWED_ORIGIN may hold several website addresses separated by commas or spaces.
+  String(process.env.ALLOWED_ORIGIN || '').split(/[\s,]+/).forEach(function (x) {
+    if (x && x !== '*') { try { var o = new URL(x).origin; if (list.indexOf(o) < 0) list.push(o); } catch (e) {} }
+  });
   return list;
 }
 function setCors(req, res, headers) {
