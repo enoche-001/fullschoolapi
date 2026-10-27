@@ -61,3 +61,7 @@ Setup (do it for Test now, and again for Live later, they are separate):
 Optional Vercel variable: `RECEIPT_BCC` = a school address (e.g. the bursar) that also gets a copy of every receipt.
 
 Notes: payments with a placeholder address (@newtownacademy.edu.ng, used when a student has no parent email) are skipped. Rarely, Paystack may deliver the same event twice, which would send a duplicate receipt.
+
+## Which websites may call this server (ALLOWED_ORIGIN)
+`https://enoche-001.github.io` is always allowed. To also allow your Vercel website, set `ALLOWED_ORIGIN` in Vercel to its address; for several sites separate them with commas, e.g.
+`https://yourschool.vercel.app, https://another.vercel.app` (paths and trailing slashes are ignored). Redeploy after changing it.
