@@ -49,3 +49,15 @@ Any `false` means that variable/package is missing: fix it and Redeploy.
 ## Logo and login button
 The school logo is built into the email (lib/logo.js), so it shows without depending on any website.
 Set `PORTAL_URL` in Vercel to your live website address (no slash at the end) so the login button goes to the right site.
+
+## Payment receipts (api/paystack-webhook.js)
+Paystack tells this server whenever a payment succeeds, even if the payer's phone lost network or closed the page. The server confirms the payment with Paystack, then emails a branded receipt (registration fee or school fees) to the email used for the payment.
+
+Setup (do it for Test now, and again for Live later, they are separate):
+1. Paystack dashboard > Settings > API Keys & Webhooks.
+2. Webhook URL = `https://fullschoolapi.vercel.app/api/paystack-webhook` > Save.
+3. Open that same address in a browser: it should show `secretKeySet` and `gmailSet` both `true`.
+
+Optional Vercel variable: `RECEIPT_BCC` = a school address (e.g. the bursar) that also gets a copy of every receipt.
+
+Notes: payments with a placeholder address (@newtownacademy.edu.ng, used when a student has no parent email) are skipped. Rarely, Paystack may deliver the same event twice, which would send a duplicate receipt.
