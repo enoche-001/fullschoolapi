@@ -1,1 +1,4 @@
-{ "version": 2 }
+{
+  "version": 2,
+  "functions": { "api/ai-generate.js": { "maxDuration": 60 } }
+}

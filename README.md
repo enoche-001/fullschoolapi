@@ -65,3 +65,16 @@ Notes: payments with a placeholder address (@newtownacademy.edu.ng, used when a 
 ## Which websites may call this server (ALLOWED_ORIGIN)
 `https://enoche-001.github.io` is always allowed. To also allow your Vercel website, set `ALLOWED_ORIGIN` in Vercel to its address; for several sites separate them with commas, e.g.
 `https://yourschool.vercel.app, https://another.vercel.app` (paths and trailing slashes are ignored). Redeploy after changing it.
+
+## AI questions (api/ai-generate.js) – OpenRouter
+Powers the AI Generator for teachers and admin. Only a signed-in admin or teacher can call it (same check style as send-credentials), max 40 requests/hour per user.
+
+Setup:
+1. Make an account at openrouter.ai, add some credit (Credits page) and create a key (Keys page).
+2. Vercel > your project > Settings > Environment Variables:
+   - `OPENROUTER_API_KEY` = the key (starts with `sk-or-`)
+   - `OPENROUTER_MODEL` (optional) = any OpenRouter model id. Default `deepseek/deepseek-chat` (fast and cheap). For stronger maths/diagrams try a larger model, e.g. one of the Claude, GPT or Gemini models listed on openrouter.ai/models; if unsure, keep the default.
+3. Upload this folder to the server repo (new file `api/ai-generate.js`, updated `vercel.json`), then Redeploy.
+4. Check: open `https://fullschoolapi.vercel.app/api/ai-generate` in a browser. It should show `"openrouterKeySet": true`.
+
+Notes: each request asks for at most 12 questions (the website sends batches of 6-10) so it finishes inside the time limit. If OpenRouter says the account is out of credit, the teacher sees a clear message; top up at openrouter.ai.
