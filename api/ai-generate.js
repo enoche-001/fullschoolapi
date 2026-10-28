@@ -7,12 +7,15 @@
 //
 // Vercel environment variables:
 //   GEMINI_API_KEY   your key from https://aistudio.google.com/apikey   (REQUIRED)
-//   GEMINI_MODEL     optional, default "gemini-2.5-flash". Any Gemini model name from AI Studio works.
+//   GEMINI_MODEL     optional, default "gemini-3.8-flash". Any Gemini model name from AI Studio works.
+//                    You can list several, comma separated: they are tried in order if one is busy/unavailable.
 // Optional: ALLOWED_ORIGIN, FIREBASE_PROJECT_ID
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'veil-1-bd7b5';
 const SITE = 'https://enoche-001.github.io';
-const MODEL = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').replace(/^models\//, '');
+// GEMINI_MODEL may hold several names separated by commas. They are tried in order when one is busy or unavailable.
+const MODELS = String(process.env.GEMINI_MODEL || 'gemini-3.8-flash,gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite').split(',').map(x => x.trim().replace(/^models\//, '')).filter(Boolean);
+const MODEL = MODELS[0];
 
 function allowedOrigins() {
   const list = [SITE];
@@ -106,7 +109,7 @@ module.exports = async (req, res) => {
   setCors(req, res, 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, service: 'ai-generate', geminiKeySet: !!process.env.GEMINI_API_KEY, model: MODEL });
+    return res.status(200).json({ ok: true, service: 'ai-generate', geminiKeySet: !!process.env.GEMINI_API_KEY, models: MODELS });
   }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, message: 'Method not allowed' });
 
@@ -137,30 +140,40 @@ module.exports = async (req, res) => {
   if (!b.subject) return res.status(400).json({ ok: false, message: 'Subject is required.' });
   if (!b.topic && !b.material) return res.status(400).json({ ok: false, message: 'Give a topic or upload teaching material.' });
 
-  let text = '';
-  try {
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(MODEL) + ':generateContent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: buildPrompt(b) }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: parseInt(process.env.GEMINI_MAX_TOKENS, 10) || 6000, responseMimeType: 'application/json' }
-      })
-    });
-    let data = {}; try { data = await r.json(); } catch (e) {}
+  let text = '', lastErr = null, usedModel = '';
+  for (const model of MODELS) {
+    let r, data = {};
+    try {
+      r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: buildPrompt(b) }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: parseInt(process.env.GEMINI_MAX_TOKENS, 10) || 6000, responseMimeType: 'application/json' }
+        })
+      });
+      try { data = await r.json(); } catch (e) {}
+    } catch (e) { lastErr = { status: 0, message: 'Could not reach the AI service. Try again.' }; continue; }
     if (!r.ok) {
       const gm = (data && data.error && data.error.message) || ('AI service error ' + r.status);
-      if (r.status === 429) return res.status(429).json({ ok: false, message: 'The AI is busy or the free daily limit is reached. Please try again later.' });
-      if (r.status === 400 || r.status === 401 || r.status === 403 || r.status === 404) return res.status(502).json({ ok: false, message: 'Gemini rejected the request (check the API key and model name): ' + gm });
-      return res.status(502).json({ ok: false, message: 'Gemini error: ' + gm });
+      lastErr = { status: r.status, message: gm, model };
+      // busy / overloaded / model gone: try the next model in the list
+      if (r.status === 429 || r.status === 404 || r.status >= 500 || /no longer available|not found|overloaded|high demand/i.test(gm)) continue;
+      break;
     }
     const cand = data.candidates && data.candidates[0];
     if (!cand || !cand.content || !cand.content.parts) {
-      const why = (data.promptFeedback && data.promptFeedback.blockReason) || (cand && cand.finishReason) || 'empty answer';
-      return res.status(502).json({ ok: false, message: 'The AI returned nothing usable (' + why + '). Try different wording or fewer questions.' });
+      lastErr = { status: 200, message: 'The AI returned nothing usable (' + ((data.promptFeedback && data.promptFeedback.blockReason) || (cand && cand.finishReason) || 'empty answer') + '). Try different wording or fewer questions.', blocked: true };
+      break;
     }
-    text = cand.content.parts.map(p => p.text || '').join('');
-  } catch (e) { return res.status(502).json({ ok: false, message: 'Could not reach the AI service. Try again.' }); }
+    text = cand.content.parts.map(p => p.text || '').join(''); usedModel = model; lastErr = null; break;
+  }
+  if (lastErr) {
+    if (lastErr.blocked || lastErr.status === 0) return res.status(502).json({ ok: false, message: lastErr.message });
+    if (lastErr.status === 429) return res.status(429).json({ ok: false, message: 'The AI is busy or the free daily limit is reached. Please try again later.' });
+    if ([400, 401, 403, 404].includes(lastErr.status)) return res.status(502).json({ ok: false, message: 'Gemini rejected the request (check the API key and model name): ' + lastErr.message });
+    return res.status(502).json({ ok: false, message: 'Gemini error: ' + lastErr.message });
+  }
 
   let parsed;
   try { parsed = parseJSON(text); }
@@ -178,5 +191,5 @@ module.exports = async (req, res) => {
     out.push(item);
   });
   if (!out.length) return res.status(502).json({ ok: false, message: 'No usable questions came back. Try again or change the topic.' });
-  return res.status(200).json({ ok: true, questions: out, model: MODEL });
+  return res.status(200).json({ ok: true, questions: out, model: usedModel });
 };
