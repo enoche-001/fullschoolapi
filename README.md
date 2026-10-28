@@ -66,15 +66,16 @@ Notes: payments with a placeholder address (@newtownacademy.edu.ng, used when a 
 `https://enoche-001.github.io` is always allowed. To also allow your Vercel website, set `ALLOWED_ORIGIN` in Vercel to its address; for several sites separate them with commas, e.g.
 `https://yourschool.vercel.app, https://another.vercel.app` (paths and trailing slashes are ignored). Redeploy after changing it.
 
-## AI questions (api/ai-generate.js) – OpenRouter
+## AI questions (api/ai-generate.js) – Google Gemini (AI Studio)
 Powers the AI Generator for teachers and admin. Only a signed-in admin or teacher can call it (same check style as send-credentials), max 40 requests/hour per user.
 
 Setup:
-1. Make an account at openrouter.ai, add some credit (Credits page) and create a key (Keys page).
+1. Go to https://aistudio.google.com/apikey, sign in with Google and click Create API key.
 2. Vercel > your project > Settings > Environment Variables:
-   - `OPENROUTER_API_KEY` = the key (starts with `sk-or-`)
-   - `OPENROUTER_MODEL` (optional) = any OpenRouter model id. Default `deepseek/deepseek-chat` (fast and cheap). For stronger maths/diagrams try a larger model, e.g. one of the Claude, GPT or Gemini models listed on openrouter.ai/models; if unsure, keep the default.
+   - `GEMINI_API_KEY` = the key
+   - `GEMINI_MODEL` (optional) = a model name from AI Studio. Default `gemini-2.5-flash`. If Google releases a newer Flash or Pro model, put its name here.
+   - `GEMINI_MAX_TOKENS` (optional) = max reply length, default 6000
 3. Upload this folder to the server repo (new file `api/ai-generate.js`, updated `vercel.json`), then Redeploy.
-4. Check: open `https://fullschoolapi.vercel.app/api/ai-generate` in a browser. It should show `"openrouterKeySet": true`.
+4. Check: open `https://fullschoolapi.vercel.app/api/ai-generate` in a browser. It should show `"geminiKeySet": true` and the model name.
 
-Notes: each request asks for at most 12 questions (the website sends batches of 6-10) so it finishes inside the time limit. If OpenRouter says the account is out of credit, the teacher sees a clear message; top up at openrouter.ai.
+Notes: the free tier has per-minute and per-day limits; teachers see a clear "AI is busy" message when they hit one. On the free tier Google may use prompts to improve its products, so do not put student names or personal data into the generator. Each request asks for at most 12 questions (the website sends batches of 6-10) so it finishes inside the time limit.
