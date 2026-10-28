@@ -6,13 +6,13 @@
 // GET shows whether the server is set up (no secrets shown).
 //
 // Vercel environment variables:
-//   OPENROUTER_API_KEY   your key from https://openrouter.ai/keys   (REQUIRED)
-//   OPENROUTER_MODEL     optional, default "deepseek/deepseek-chat". Any OpenRouter model id works.
+//   GEMINI_API_KEY   your key from https://aistudio.google.com/apikey   (REQUIRED)
+//   GEMINI_MODEL     optional, default "gemini-2.5-flash". Any Gemini model name from AI Studio works.
 // Optional: ALLOWED_ORIGIN, FIREBASE_PROJECT_ID
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'veil-1-bd7b5';
 const SITE = 'https://enoche-001.github.io';
-const MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+const MODEL = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').replace(/^models\//, '');
 
 function allowedOrigins() {
   const list = [SITE];
@@ -106,12 +106,12 @@ module.exports = async (req, res) => {
   setCors(req, res, 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, service: 'ai-generate', openrouterKeySet: !!process.env.OPENROUTER_API_KEY, model: MODEL });
+    return res.status(200).json({ ok: true, service: 'ai-generate', geminiKeySet: !!process.env.GEMINI_API_KEY, model: MODEL });
   }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, message: 'Method not allowed' });
 
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return res.status(500).json({ ok: false, message: 'AI is not set up on the server yet (OPENROUTER_API_KEY missing).' });
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return res.status(500).json({ ok: false, message: 'AI is not set up on the server yet (GEMINI_API_KEY missing).' });
 
   const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
   if (!m) return res.status(401).json({ ok: false, message: 'Please sign in again.' });
@@ -137,25 +137,33 @@ module.exports = async (req, res) => {
   if (!b.subject) return res.status(400).json({ ok: false, message: 'Subject is required.' });
   if (!b.topic && !b.material) return res.status(400).json({ ok: false, message: 'Give a topic or upload teaching material.' });
 
-  let data;
+  let text = '';
   try {
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(MODEL) + ':generateContent', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json', Authorization: 'Bearer ' + key,
-        'HTTP-Referer': process.env.PORTAL_URL || SITE, 'X-Title': 'Newtown Academy CBT'
-      },
-      body: JSON.stringify({ model: MODEL, temperature: 0.4, max_tokens: 7000, messages: [{ role: 'user', content: buildPrompt(b) }] })
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: buildPrompt(b) }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: parseInt(process.env.GEMINI_MAX_TOKENS, 10) || 6000, responseMimeType: 'application/json' }
+      })
     });
-    data = await r.json();
-    if (!r.ok || data.error) {
-      const msg = (data && data.error && data.error.message) || ('AI service error ' + r.status);
-      return res.status(502).json({ ok: false, message: r.status === 402 ? 'The OpenRouter account is out of credit. Top it up at openrouter.ai.' : r.status === 401 ? 'The OpenRouter API key is invalid.' : msg });
+    let data = {}; try { data = await r.json(); } catch (e) {}
+    if (!r.ok) {
+      const gm = (data && data.error && data.error.message) || ('AI service error ' + r.status);
+      if (r.status === 429) return res.status(429).json({ ok: false, message: 'The AI is busy or the free daily limit is reached. Please try again later.' });
+      if (r.status === 400 || r.status === 401 || r.status === 403 || r.status === 404) return res.status(502).json({ ok: false, message: 'Gemini rejected the request (check the API key and model name): ' + gm });
+      return res.status(502).json({ ok: false, message: 'Gemini error: ' + gm });
     }
+    const cand = data.candidates && data.candidates[0];
+    if (!cand || !cand.content || !cand.content.parts) {
+      const why = (data.promptFeedback && data.promptFeedback.blockReason) || (cand && cand.finishReason) || 'empty answer';
+      return res.status(502).json({ ok: false, message: 'The AI returned nothing usable (' + why + '). Try different wording or fewer questions.' });
+    }
+    text = cand.content.parts.map(p => p.text || '').join('');
   } catch (e) { return res.status(502).json({ ok: false, message: 'Could not reach the AI service. Try again.' }); }
 
   let parsed;
-  try { parsed = parseJSON(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content); }
+  try { parsed = parseJSON(text); }
   catch (e) { return res.status(502).json({ ok: false, message: 'The AI gave an unreadable answer. Please try again.' }); }
 
   const out = [];
